@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>飞行器大战 - Flight Shooter</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #1a1a2e; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: 'Microsoft YaHei', sans-serif; overflow: hidden; }
+        #gameContainer { position: relative; border: 2px solid #e94560; border-radius: 8px; box-shadow: 0 0 30px rgba(233,69,96,0.5); }
+        canvas { display: block; border-radius: 6px; }
+        #ui { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; justify-content: space-between; color: #fff; font-size: 18px; pointer-events: none; }
+        #score { color: #0f3460; background: rgba(255,255,255,0.85); padding: 4px 12px; border-radius: 4px; }
+        #lives { color: #e94560; background: rgba(255,255,255,0.85); padding: 4px 12px; border-radius: 4px; }
+        #overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(0,0,0,0.7); color: #fff; text-align: center; border-radius: 6px; }
+        #overlay h1 { font-size: 42px; margin-bottom: 10px; color: #e94560; }
+        #overlay p { font-size: 18px; margin-bottom: 20px; color: #ccc; }
+        #overlay button { padding: 12px 40px; font-size: 20px; background: #e94560; color: #fff; border: none; border-radius: 6px; cursor: pointer; transition: all 0.3s; }
+        #overlay button:hover { background: #ff6b81; transform: scale(1.05); }
+        #finalScore { font-size: 28px; color: #0f3460; background: rgba(255,255,255,0.9); padding: 8px 24px; border-radius: 6px; margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="game" width="480" height="640"></canvas>
+        <div id="ui"><span id="score">得分: 0</span><span id="lives">生命: ❤❤❤</span></div>
+        <div id="overlay">
+            <h1>🚀 飞行器大战</h1>
+            <p>方向键/WASD 移动 · 自动射击已开启</p>
+            <button onclick="startGame()">开始游戏</button>
+        </div>
+    </div>
+    <script>
+    const canvas=document.getElementById('game'),ctx=canvas.getContext('2d'),W=canvas.width,H=canvas.height;
+    let player,bullets,enemies,particles,score,lives,gameRunning,enemyTimer,powerUpTimer,powerUps,keys={};
+    class Player{constructor(){this.x=W/2;this.y=H-80;this.w=40;this.h=40;this.speed=5;this.shootCD=0;this.invincible=0}
+    update(){if(keys['ArrowLeft']||keys['a'])this.x-=this.speed;if(keys['ArrowRight']||keys['d'])this.x+=this.speed;if(keys['ArrowUp']||keys['w'])this.y-=this.speed;if(keys['ArrowDown']||keys['s'])this.y+=this.speed;this.x=Math.max(this.w/2,Math.min(W-this.w/2,this.x));this.y=Math.max(this.h/2,Math.min(H-this.h/2,this.y));this.shootCD--;if(this.shootCD<=0){this.shoot();this.shootCD=8}if(this.invincible>0)this.invincible--}
+    shoot(){bullets.push(new Bullet(this.x,this.y-this.h/2,0,-10,'#00d2ff','player'))}
+    draw(){if(this.invincible>0&&this.invincible%6<3)return;ctx.save();ctx.translate(this.x,this.y);ctx.fillStyle='#00d2ff';ctx.beginPath();ctx.moveTo(0,-20);ctx.lineTo(-15,10);ctx.lineTo(-8,5);ctx.lineTo(-8,18);ctx.lineTo(8,18);ctx.lineTo(8,5);ctx.lineTo(15,10);ctx.closePath();ctx.fill();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(0,-5,5,0,Math.PI*2);ctx.fill();ctx.fillStyle='#e94560';ctx.beginPath();ctx.moveTo(-5,18);ctx.lineTo(0,18+Math.random()*12+8);ctx.lineTo(5,18);ctx.closePath();ctx.fill();ctx.restore()}}
+    class Bullet{constructor(x,y,vx,vy,color,owner){this.x=x;this.y=y;+this.vx=vx;this.vy=vy;this.color=color;this.owner=owner;this.r=owner==='player'?4:5}
+    update(){this.x+=this.vx;this.y+=this.vy}
+    draw(){ctx.fillStyle=this.color;ctx.shadowBlur=8;ctx.shadowColor=this.color;ctx.beginPath();ctx.arc(this.x,this.y,this.r,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0}
+    offScreen(){return this.y<-20||this.y>H+20||this.x<-20||this.x>W+20}}
+    class Enemy{constructor(){this.type=Math.random()<0.15?'big':'small';this.x=Math.random()*(W-60)+30;this.y=-30;if(this.type==='big'){this.w=50;this.h=50;this.hp=3;this.speed=1.5;this.score=30}else{this.w=35;this.h=35;this.hp=1;this.speed=2.5+Math.random();this.score=10}this.shootCD=Math.random()*60+30;this.zigzag=Math.random()<0.3;this.dir=1}
+    update(){this.y+=this.speed;if(this.zigzag){this.x+=this.dir*2;if(this.x<30||this.x>W-30)this.dir*=-1}this.shootCD--;if(this.shootCD<=0&&this.y>0&&this.y<H-100){bullets.push(new Bullet(this.x,this.y+this.h/2,0,5,'#e94560','enemy'));this.shootCD=this.type==='big'?40:80}}
+    draw(){ctx.save();ctx.translate(this.x,this.y);if(this.type==='big'){ctx.fillStyle='#ff6b81';ctx.beginPath();ctx.moveTo(0,22);ctx.lineTo(-22,-8);ctx.lineTo(-12,-12);ctx.lineTo(0,-18);ctx.lineTo(12,-12);ctx.lineTo(22,-8);ctx.closePath();ctx.fill();ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(0,0,6,0,Math.PI*2);ctx.fill()}else{ctx.fillStyle='#e94560';ctx.beginPath();ctx.moveTo(0,16);ctx.lineTo(-16,-6);ctx.lineTo(0,-14);ctx.lineTo(16,-6);ctx.closePath();ctx.fill()}ctx.restore()}
+    hit(){this.hp--;return this.hp<=0}}
+    class Particle{constructor(x,y,color){this.x=x;this.y=y;this.vx=(Math.random()-0.5)*8;this.vy=(Math.random()-0.5)*8;this.life=30;this.color=color;this.size=Math.random()*4+2}
+    update(){this.x+=this.vx;this.y+=this.vy;this.life--;this.vx*=0.95;this.vy*=0.95}
+    draw(){ctx.globalAlpha=this.life/30;ctx.fillStyle=this.color;ctx.beginPath();ctx.arc(this.x,this.y,this.size,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1}}
+    class PowerUp{constructor(x,y){this.x=x;this.y=y;this.r=12;this.speed=2;this.type=Math.random()<0.5?'life':'rapid'}
+    update(){this.y+=this.speed}
+    draw(){ctx.save();ctx.translate(this.x,this.y);ctx.fillStyle=this.type==='life'?'#0f3460':'#f5a623';ctx.shadowBlur=10;ctx.shadowColor=ctx.fillStyle;ctx.beginPath();ctx.arc(0,0,this.r,0,Math.PI*2);ctx.fill();ctx.shadowBlur=0;ctx.fillStyle='#fff';ctx.font='14px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(this.type==='life'?'❤':'⚡',0,0);ctx.restore()}}
+    function explode(x,y,c,n){for(let i=0;i<(n||15);i++)particles.push(new Particle(x,y,c))}
+    function startGame(){player=new Player();bullets=[];enemies=[];particles=[];powerUps=[];score=0;lives=3;enemyTimer=0;powerUpTimer=0;gameRunning=true;document.getElementById('overlay').style.display='none';updateUI()}
+    function updateUI(){document.getElementById('score').textContent='得分: '+score;document.getElementById('lives').textContent='生命: '+'❤'.repeat(Math.max(0,lives))}
+    function gameOver(){gameRunning=false;const o=document.getElementById('overlay');o.innerHTML='<h1>💥 游戏结束</h1><div id="finalScore">最终得分: '+score+'</div><p>再来一局？</p><button onclick="startGame()">重新开始</button>';o.style.display='flex'}
+    function gameLoop(){if(!gameRunning){requestAnimationFrame(gameLoop);return}ctx.fillStyle='#1a1a2e';ctx.fillRect(0,0,W,H);ctx.fillStyle='rgba(255,255,255,0.3)';for(let i=0;i<50;i++){let sx=(i*37)%W;let sy=(i*71+Date.now()/20)%H;ctx.fillRect(sx,sy,2,2)}player.update();player.draw();for(let i=bullets.length-1;i>=0;i--){bullets[i].update();bullets[i].draw();if(bullets[i].offScreen()){bullets.splice(i,1);continue}if(bullets[i].owner==='player'){for(let j=enemies.length-1;j>=0;j--){let e=enemies[j];if(Math.abs(bullets[i].x-e.x)<e.w/2&&Math.abs(bullets[i].y-e.y)<e.h/2){bullets.splice(i,1);if(e.hit()){explode(e.x,e.y,'#e94560',e.type==='big'?25:12);score+=e.score;if(Math.random()<0.1)powerUps.push(new PowerUp(e.x,e.y));enemies.splice(j,1);updateUI()}else{explode(e.x,e.y,'#ff6b81',5)}break}}}else if(bullets[i].owner==='enemy'&&player.invincible<=0){if(Math.abs(bullets[i].x-player.x)<player.w/2&&Math.abs(bullets[i].y-player.y)<player.h/2){bullets.splice(i,1);lives--;player.invincible=60;explode(player.x,player.y,'#00d2ff',10);updateUI();if(lives<=0)gameOver()}}}enemyTimer++;let sr=Math.max(20,60-Math.floor(score/50)*5);if(enemyTimer>=sr){enemies.push(new Enemy());enemyTimer=0}for(let i=enemies.length-1;i>=0;i--){enemies[i].update();enemies[i].draw();if(enemies[i].y>H+30){enemies.splice(i,1);continue}if(player.invincible<=0&&Math.abs(enemies[i].x-player.x)<(enemies[i].w+player.w)/2-5&&Math.abs(enemies[i].y-player.y)<(enemies[i].h+player.h)/2-5){lives--;player.invincible=60;explode(player.x,player.y,'#00d2ff',15);explode(enemies[i].x,enemies[i].y,'#e94560',12);enemies.splice(i,1);updateUI();if(lives<=0)gameOver()}}powerUpTimer++;if(powerUpTimer>=500){powerUps.push(new PowerUp(Math.random()*(W-60)+30,-20));powerUpTimer=0}for(let i=powerUps.length-1;i>=0;i--){powerUps[i].update();powerUps[i].draw();if(powerUps[i].y>H+20){powerUps.splice(i,1);continue}if(Math.abs(powerUps[i].x-player.x)<player.w/2+powerUps[i].r&&Math.abs(powerUps[i].y-player.y)<player.h/2+powerUps[i].r){if(powerUps[i].type==='life'){lives++}else{score+=50}explode(powerUps[i].x,powerUps[i].y,'#f5a623',10);powerUps.splice(i,1);updateUI()}}for(let i=particles.length-1;i>=0;i--){particles[i].update();particles[i].draw();if(particles[i].life<=0)particles.splice(i,1)}requestAnimationFrame(gameLoop)}
+    document.addEventListener('keydown',e=>{keys[e.key]=true;if(e.key===' ')e.preventDefault()});
+    document.addEventListener('keyup',e=>{keys[e.key]=false});
+    requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
